@@ -1,0 +1,51 @@
+services:
+
+  # ─── API Laravel (PHP-FPM) ────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: validador_api
+    volumes:
+      - ./api:/var/www
+    working_dir: /var/www
+    depends_on:
+      - mysql
+    networks:
+      - validador_net
+
+  # ─── Nginx: serves built Vue SPA + reverse-proxies Laravel/Filament ──
+  nginx:
+    build:
+      context: .
+      dockerfile: docker/nginx/Dockerfile
+    container_name: validador_nginx
+    volumes:
+      - ./api:/var/www:ro
+    ports:
+      - "8097:80"
+    depends_on:
+      - api
+    networks:
+      - validador_net
+
+  # ─── Banco de dados ───────────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: validador_mysql
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-validador}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
+      MYSQL_USER: ${DB_USERNAME:-validador}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-secret}
+    volumes:
+      - validador_mysql_data:/var/lib/mysql
+    networks:
+      - validador_net
+
+networks:
+  validador_net:
+    driver: bridge
+
+volumes:
+  validador_mysql_data:
