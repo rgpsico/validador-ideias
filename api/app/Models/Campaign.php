@@ -18,6 +18,7 @@ class Campaign extends Model
         'descricao',
         'formato',
         'ativo',
+        'webhook_url',
     ];
 
     protected $casts = [

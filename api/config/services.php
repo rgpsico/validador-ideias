@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'validador_webhook' => [
+        'secret' => env('VALIDADOR_WEBHOOK_SECRET'),
+    ],
+
 ];

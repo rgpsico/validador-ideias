@@ -8,6 +8,8 @@ use App\Models\Lead;
 use App\Models\Question;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
 class LeadController extends Controller
@@ -52,7 +54,7 @@ class LeadController extends Controller
      */
     public function finalizar(Request $request, string $uuid): JsonResponse
     {
-        $lead = Lead::query()->where('uuid', $uuid)->with('answers.question')->first();
+        $lead = Lead::query()->where('uuid', $uuid)->with(['answers.question', 'campaign'])->first();
 
         if (!$lead) {
             return response()->json(['message' => 'Lead não encontrado.'], 404);
@@ -85,6 +87,47 @@ class LeadController extends Controller
             'email' => $data['email'] ?? $contact['email'] ?? $lead->email,
         ]);
 
+        $this->notificarWebhook($lead);
+
         return response()->json(['message' => 'Concluído.'], 200);
+    }
+
+    /**
+     * Se a campanha tem um webhook configurado e o lead deixou nome+whatsapp
+     * (ou seja, topou ser contatado), envia os dados pra fora. Nunca falha a
+     * requisição do respondente por causa disso.
+     */
+    private function notificarWebhook(Lead $lead): void
+    {
+        $url = $lead->campaign?->webhook_url;
+
+        if (!$url || !$lead->nome || !$lead->whatsapp) {
+            return;
+        }
+
+        try {
+            Http::timeout(5)
+                ->withHeaders(['X-Webhook-Secret' => config('services.validador_webhook.secret')])
+                ->post($url, [
+                    'campaign_slug' => $lead->campaign->slug,
+                    'campaign_titulo' => $lead->campaign->titulo,
+                    'lead_uuid' => $lead->uuid,
+                    'nome' => $lead->nome,
+                    'whatsapp' => $lead->whatsapp,
+                    'email' => $lead->email,
+                    'score' => $lead->score,
+                    'classificacao' => $lead->classificacao,
+                    'respostas' => $lead->answers->map(fn ($a) => [
+                        'pergunta' => $a->question->texto,
+                        'resposta' => $a->value,
+                    ])->values(),
+                ]);
+        } catch (\Throwable $e) {
+            Log::warning('Falha ao notificar webhook do validador', [
+                'lead_id' => $lead->id,
+                'url' => $url,
+                'erro' => $e->getMessage(),
+            ]);
+        }
     }
 }
