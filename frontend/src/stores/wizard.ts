@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import api from '../services/api'
+import { initPixel, trackPixelEvent } from '../services/pixel'
 import type { AnswerValue, CampaignData, Question, QuestionRule } from '../types'
 
 function evaluateRule(rule: QuestionRule, actual: AnswerValue | undefined): boolean {
@@ -84,6 +85,7 @@ export const useWizardStore = defineStore('wizard', {
       try {
         const { data } = await api.get<CampaignData>(`/campanhas/${slug}`)
         this.campaign = data
+        if (data.pixel_id) initPixel(data.pixel_id)
       } catch {
         this.notFound = true
         this.loading = false
@@ -152,6 +154,14 @@ export const useWizardStore = defineStore('wizard', {
         await api.post(`/leads/${this.leadUuid}/finalizar`, {})
         this.finished = true
         localStorage.removeItem(`validador_lead_${this.slug}`)
+
+        // So conta como conversao pro Pixel se a pessoa realmente deixou contato
+        // (nunca temos score/classificacao aqui, isso e interno).
+        const whatsappQuestion = this.campaign?.questions.find((q) => q.tipo === 'whatsapp')
+        const deixouContato = whatsappQuestion ? Boolean(this.answers[whatsappQuestion.id]) : false
+        if (deixouContato) {
+          trackPixelEvent('Lead', { content_name: this.campaign?.titulo })
+        }
       } finally {
         this.submitting = false
       }

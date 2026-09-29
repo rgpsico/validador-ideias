@@ -35,6 +35,7 @@ export interface CampaignData {
   descricao: string | null
   formato: string
   slug: string
+  pixel_id: string | null
   questions: Question[]
   rules: QuestionRule[]
 }

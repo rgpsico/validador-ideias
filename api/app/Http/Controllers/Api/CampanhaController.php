@@ -38,6 +38,7 @@ class CampanhaController extends Controller
             'descricao' => $campaign->descricao,
             'formato' => $campaign->formato,
             'slug' => $campaign->slug,
+            'pixel_id' => $campaign->pixel_id,
             'questions' => $campaign->questions->map(function ($q) {
                 return [
                     'id' => $q->id,
